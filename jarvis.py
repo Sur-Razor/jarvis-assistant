@@ -214,8 +214,7 @@ def ask_jarvis(question, analytics_context=None):
         "-c", "2048",
         "--temp", "0.7",
         "--no-display-prompt",
-        "--simple-io",
-        "--no-conversation"
+        "--simple-io"
     ]
 
     try:
