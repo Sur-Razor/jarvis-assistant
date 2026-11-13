@@ -11,3 +11,4 @@ jobs:
     steps:
       - name: Confirm scheduled run
         run: echo "GitHub scheduler is working."
+
