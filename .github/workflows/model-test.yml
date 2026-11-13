@@ -31,19 +31,19 @@ jobs:
             -DGGML_OPENMP=ON
           cmake --build llama.cpp/build --config Release -j2
 
-      - name: Download Qwen3 0.6B
+           - name: Download Qwen3 0.6B
         run: |
           mkdir -p models
           python -m pip install -U huggingface_hub
-          hf download Qwen/Qwen3-0.6B-GGUF \
-            Qwen3-0.6B-Q4_K_M.gguf \
+          hf download bartowski/Qwen_Qwen3-0.6B-GGUF \
+            Qwen_Qwen3-0.6B-Q4_K_M.gguf \
             --local-dir models
-          ls -lh models/Qwen3-0.6B-Q4_K_M.gguf
+          ls -lh models/Qwen_Qwen3-0.6B-Q4_K_M.gguf
 
       - name: Run first AI test
         run: |
           llama.cpp/build/bin/llama-cli \
-            -m models/Qwen3-0.6B-Q4_K_M.gguf \
+            -m models/Qwen_Qwen3-0.6B-Q4_K_M.gguf \
             -p "You are JARVIS, a helpful personal AI assistant. Introduce yourself in two sentences." \
             -n 100 \
             -c 2048
