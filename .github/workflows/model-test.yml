@@ -38,11 +38,11 @@ jobs:
             "https://huggingface.co/bartowski/Qwen_Qwen3-4B-Instruct-2507-GGUF/resolve/main/Qwen3-4B-Instruct-2507-Q4_K_M.gguf" \
             -o models/qwen3-4b.gguf
 
+     
       - name: Run first AI test
         run: |
           llama.cpp/build/bin/llama-cli \
             -m models/qwen3-4b.gguf \
-            -cnv \
             -p "You are JARVIS, a helpful personal AI assistant. Introduce yourself in two sentences." \
             -n 100 \
             -c 2048
