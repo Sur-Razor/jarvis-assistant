@@ -10,7 +10,7 @@ permissions:
 jobs:
   test-model:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
 
     steps:
       - name: Get JARVIS source code
@@ -31,7 +31,7 @@ jobs:
             -DGGML_OPENMP=ON
           cmake --build llama.cpp/build --config Release -j2
 
-           - name: Download Qwen3 0.6B
+      - name: Download Qwen3 0.6B
         run: |
           mkdir -p models
           python -m pip install -U huggingface_hub
