@@ -204,7 +204,7 @@ def ask_jarvis(question, analytics_context=None):
             f"{analytics_context}\n\n"
         )
 
-    prompt += f"User: {question}\nJARVIS:"
+    prompt += f"User: {question} /no_think\nJARVIS:"
 
     command = [
         LLAMA,
@@ -214,7 +214,8 @@ def ask_jarvis(question, analytics_context=None):
         "-c", "2048",
         "--temp", "0.7",
         "--no-display-prompt",
-        "--simple-io"
+        "--simple-io",
+        "--single-turn"
     ]
 
     try:
@@ -233,6 +234,15 @@ def ask_jarvis(question, analytics_context=None):
             )
 
         answer = result.stdout.strip()
+
+if "JARVIS:" in answer:
+    answer = answer.rsplit("JARVIS:", 1)[-1].strip()
+
+if "[ Prompt:" in answer:
+    answer = answer.split("[ Prompt:", 1)[0].strip()
+
+if "\n>" in answer:
+    answer = answer.split("\n>", 1)[0].strip()
 
         if not answer:
             return "I wasn't able to generate a response. Please try again."
