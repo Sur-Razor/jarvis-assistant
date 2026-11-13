@@ -3,7 +3,7 @@ name: JARVIS Assistant
 
 on:
   schedule:
-  - cron: "* * * * *"
+  - cron: "*/5 * * * *"
 permissions:
   contents: read
 
