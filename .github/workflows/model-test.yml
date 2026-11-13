@@ -32,7 +32,7 @@ jobs:
           cmake --build llama.cpp/build --config Release -j2
 
       
-           - name: Download Qwen3 4B
+             - name: Download Qwen3 4B
         run: |
           mkdir -p models
           python -m pip install -U huggingface_hub
