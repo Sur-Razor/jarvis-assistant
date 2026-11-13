@@ -1,0 +1,38 @@
+
+name: JARVIS AI Model Test
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test-model:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Download model engine
+        uses: actions/checkout@v4
+        with:
+          repository: ggml-org/llama.cpp
+          path: llama.cpp
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install model engine
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake libcurl4-openssl-dev
+          cmake -S llama.cpp -B llama.cpp/build \
+            -DGGML_NATIVE=OFF \
+            -DGGML_OPENMP=ON
+          cmake --build llama.cpp/build --config Release -j2
+
+      - name: Check model engine
+        run: |
+          llama.cpp/build/bin/llama-cli --version
