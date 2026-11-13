@@ -37,9 +37,9 @@ jobs:
           mkdir -p models
           python -m pip install -U huggingface_hub
           hf download bartowski/Qwen_Qwen3-4B-Instruct-2507-GGUF \
-            Qwen3-4B-Instruct-2507-Q4_K_M.gguf \
+            Qwen_Qwen3-4B-Instruct-2507-Q4_K_M.gguf \
             --local-dir models
-          mv models/Qwen3-4B-Instruct-2507-Q4_K_M.gguf models/qwen3-4b.gguf
+          mv models/Qwen_Qwen3-4B-Instruct-2507-Q4_K_M.gguf models/qwen3-4b.gguf
           ls -lh models/qwen3-4b.gguf
      
      
