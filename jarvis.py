@@ -176,6 +176,7 @@ def handle_document(message):
     return report
 
 
+
 def ask_jarvis(question, analytics_context=None):
     if not os.path.isfile(MODEL):
         return "My AI model is currently unavailable. Please try again later."
@@ -191,7 +192,8 @@ def ask_jarvis(question, analytics_context=None):
         "Do not use unnecessary emojis or slang. "
         "Never pretend to have performed an action you did not perform. "
         "Never invent live information or personal analytics. "
-        "If you do not know something, say so honestly."
+        "If you do not know something, say so honestly. "
+        "Do not show your internal reasoning. Give only the final answer."
     )
 
     prompt = f"{system_prompt}\n\n"
@@ -214,8 +216,7 @@ def ask_jarvis(question, analytics_context=None):
         "-c", "2048",
         "--temp", "0.7",
         "--no-display-prompt",
-        "--simple-io",
-        "--single-turn"
+        "--simple-io"
     ]
 
     try:
@@ -235,21 +236,17 @@ def ask_jarvis(question, analytics_context=None):
 
         answer = result.stdout.strip()
 
-if "JARVIS:" in answer:
-    answer = answer.rsplit("JARVIS:", 1)[-1].strip()
+        if "JARVIS:" in answer:
+            answer = answer.rsplit("JARVIS:", 1)[-1].strip()
 
-if "[ Prompt:" in answer:
-    answer = answer.split("[ Prompt:", 1)[0].strip()
+        if "[ Prompt:" in answer:
+            answer = answer.split("[ Prompt:", 1)[0].strip()
 
-if "\n>" in answer:
-    answer = answer.split("\n>", 1)[0].strip()
+        if "\n>" in answer:
+            answer = answer.split("\n>", 1)[0].strip()
 
         if not answer:
             return "I wasn't able to generate a response. Please try again."
-
-        # Remove any repeated assistant label if the model generates one.
-        if answer.startswith("JARVIS:"):
-            answer = answer[len("JARVIS:"):].strip()
 
         return answer[:3900]
 
