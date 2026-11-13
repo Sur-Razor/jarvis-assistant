@@ -10,40 +10,56 @@ permissions:
 jobs:
   test-model:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
 
     steps:
-      - name: Get JARVIS source code
+      - name: Get JARVIS AI engine
         uses: actions/checkout@v4
         with:
           repository: ggml-org/llama.cpp
           path: llama.cpp
 
-      - name: Install build dependencies
+      - name: Restore JARVIS AI cache
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            models/Qwen_Qwen3-0.6B-Q4_K_M.gguf
+            llama.cpp/build/
+          key: jarvis-qwen3-06b-v1
+
+      - name: Install dependencies
+        if: steps.cache.outputs.cache-hit != 'true'
         run: |
           sudo apt-get update
           sudo apt-get install -y build-essential cmake libcurl4-openssl-dev
 
-      - name: Build llama.cpp
+      - name: Build AI engine
+        if: steps.cache.outputs.cache-hit != 'true'
         run: |
           cmake -S llama.cpp -B llama.cpp/build \
             -DGGML_NATIVE=OFF \
             -DGGML_OPENMP=ON
           cmake --build llama.cpp/build --config Release -j2
 
-      - name: Download Qwen3 0.6B
+      - name: Download AI model
+        if: steps.cache.outputs.cache-hit != 'true'
         run: |
           mkdir -p models
           python -m pip install -U huggingface_hub
           hf download bartowski/Qwen_Qwen3-0.6B-GGUF \
             Qwen_Qwen3-0.6B-Q4_K_M.gguf \
             --local-dir models
-          ls -lh models/Qwen_Qwen3-0.6B-Q4_K_M.gguf
 
-      - name: Run first AI test
+      - name: Verify AI cache
+        run: |
+          test -s models/Qwen_Qwen3-0.6B-Q4_K_M.gguf
+          test -x llama.cpp/build/bin/llama-cli
+
+      - name: Test JARVIS AI
         run: |
           llama.cpp/build/bin/llama-cli \
             -m models/Qwen_Qwen3-0.6B-Q4_K_M.gguf \
-            -p "You are JARVIS, a helpful personal AI assistant. Introduce yourself in two sentences." \
-            -n 100 \
+            -p "You are JARVIS. Introduce yourself." \
+            -n 80 \
             -c 2048
