@@ -10,7 +10,7 @@ permissions:
 jobs:
   test-model:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
 
     steps:
       - name: Get JARVIS source code
@@ -19,20 +19,31 @@ jobs:
           repository: ggml-org/llama.cpp
           path: llama.cpp
 
+      - name: Restore AI model and engine cache
+        id: model-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            models/qwen3-4b.gguf
+            llama.cpp/build/
+          key: jarvis-qwen3-4b-llama-v1
+
       - name: Install build dependencies
+        if: steps.model-cache.outputs.cache-hit != 'true'
         run: |
           sudo apt-get update
           sudo apt-get install -y build-essential cmake libcurl4-openssl-dev
 
       - name: Build llama.cpp
+        if: steps.model-cache.outputs.cache-hit != 'true'
         run: |
           cmake -S llama.cpp -B llama.cpp/build \
             -DGGML_NATIVE=OFF \
             -DGGML_OPENMP=ON
           cmake --build llama.cpp/build --config Release -j2
 
-      
       - name: Download Qwen3 4B
+        if: steps.model-cache.outputs.cache-hit != 'true'
         run: |
           mkdir -p models
           python -m pip install -U huggingface_hub
@@ -40,9 +51,13 @@ jobs:
             Qwen_Qwen3-4B-Instruct-2507-Q4_K_M.gguf \
             --local-dir models
           mv models/Qwen_Qwen3-4B-Instruct-2507-Q4_K_M.gguf models/qwen3-4b.gguf
-          ls -lh models/qwen3-4b.gguf
-     
-     
+
+      - name: Verify AI engine
+        run: |
+          test -s models/qwen3-4b.gguf
+          test -x llama.cpp/build/bin/llama-cli
+          test -x llama.cpp/build/bin/llama-server
+
       - name: Run first AI test
         run: |
           llama.cpp/build/bin/llama-cli \
