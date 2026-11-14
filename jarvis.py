@@ -62,23 +62,28 @@ def send_message(message, chat_id=None):
         message = message[len(chunk):].lstrip()
 
 
+
 def get_youtube_stats():
-    params = urllib.parse.urlencode({
-        "part": "statistics,snippet",
-        "id": YOUTUBE_CHANNEL_ID,
-        "key": YOUTUBE_API_KEY
+    def youtube_request(endpoint, params):
+        params["key"] = YOUTUBE_API_KEY
+        query = urllib.parse.urlencode(params)
+        url = f"https://www.googleapis.com/youtube/v3/{endpoint}?{query}"
+
+        req = urllib.request.Request(
+            url,
+            headers={"User-Agent": "JARVIS/1.0"}
+        )
+
+        with urllib.request.urlopen(req, timeout=25) as response:
+            return json.loads(response.read().decode())
+
+    # Get channel information.
+    channel_data = youtube_request("channels", {
+        "part": "snippet,statistics,contentDetails",
+        "id": YOUTUBE_CHANNEL_ID
     })
 
-    url = f"https://www.googleapis.com/youtube/v3/channels?{params}"
-    req = urllib.request.Request(
-        url,
-        headers={"User-Agent": "JARVIS/1.0"}
-    )
-
-    with urllib.request.urlopen(req, timeout=20) as response:
-        data = json.loads(response.read().decode())
-
-    items = data.get("items", [])
+    items = channel_data.get("items", [])
 
     if not items:
         return "I couldn't find the configured YouTube channel."
@@ -87,14 +92,147 @@ def get_youtube_stats():
     stats = channel.get("statistics", {})
     snippet = channel.get("snippet", {})
 
-    return (
-        "JARVIS — YOUTUBE CHANNEL STATUS\n\n"
-        f"Channel: {snippet.get('title', 'Unavailable')}\n"
-        f"Subscribers: {number(stats.get('subscriberCount'))}\n"
-        f"Total views: {number(stats.get('viewCount'))}\n"
-        f"Total videos: {number(stats.get('videoCount'))}\n"
-        "\nSubscriber counts may be rounded by YouTube."
+    subscribers = int(stats.get("subscriberCount", 0))
+    total_views = stats.get("viewCount", "0")
+    total_videos = stats.get("videoCount", "0")
+
+    # Find the channel's uploads playlist.
+    uploads_playlist = (
+        channel.get("contentDetails", {})
+        .get("relatedPlaylists", {})
+        .get("uploads")
     )
+
+    videos = []
+
+    if uploads_playlist:
+        playlist_data = youtube_request("playlistItems", {
+            "part": "snippet,contentDetails",
+            "playlistId": uploads_playlist,
+            "maxResults": 10
+        })
+
+        video_ids = [
+            item.get("contentDetails", {}).get("videoId")
+            for item in playlist_data.get("items", [])
+            if item.get("contentDetails", {}).get("videoId")
+        ]
+
+        if video_ids:
+            video_data = youtube_request("videos", {
+                "part": "snippet,statistics",
+                "id": ",".join(video_ids)
+            })
+
+            video_lookup = {
+                video["id"]: video
+                for video in video_data.get("items", [])
+            }
+
+            for video_id in video_ids:
+                video = video_lookup.get(video_id)
+
+                if video:
+                    video_stats = video.get("statistics", {})
+                    video_snippet = video.get("snippet", {})
+
+                    videos.append({
+                        "title": video_snippet.get("title", "Untitled"),
+                        "views": int(video_stats.get("viewCount", 0)),
+                        "date": video_snippet.get("publishedAt", "")[:10],
+                        "url": f"https://www.youtube.com/watch?v={video_id}"
+                    })
+
+    lines = [
+        "JARVIS — DETAILED YOUTUBE REPORT",
+        "",
+        "CHANNEL OVERVIEW",
+        f"Channel: {snippet.get('title', 'Sur-Razor')}",
+        f"Subscribers: {number(subscribers)}",
+        f"Total channel views: {number(total_views)}",
+        f"Total videos: {number(total_videos)}",
+        "",
+        "SUBSCRIBER MILESTONES"
+    ]
+
+    milestones = [15000, 25000, 50000, 100000]
+    next_milestone = next(
+        (milestone for milestone in milestones if milestone > subscribers),
+        None
+    )
+
+    if next_milestone:
+        remaining = next_milestone - subscribers
+        progress = subscribers / next_milestone * 100
+
+        lines.append(
+            f"Next goal: {number(next_milestone)} subscribers\n"
+            f"Progress: {progress:.1f}%\n"
+            f"Remaining: {number(remaining)} subscribers"
+        )
+    else:
+        lines.append("All listed subscriber milestones reached.")
+
+    lines += ["", "LATEST UPLOADS"]
+
+    if videos:
+        for index, video in enumerate(videos[:5], 1):
+            lines.append(
+                f"{index}. {video['title']}\n"
+                f"   Date: {video['date']} | "
+                f"Views: {number(video['views'])}\n"
+                f"   {video['url']}"
+            )
+    else:
+        lines.append("No recent uploads were found.")
+
+    lines += [
+        "",
+        "TOP 5 RECENT VIDEOS BY VIEWS"
+    ]
+
+    top_videos = sorted(
+        videos,
+        key=lambda video: video["views"],
+        reverse=True
+    )[:5]
+
+    for index, video in enumerate(top_videos, 1):
+        lines.append(
+            f"{index}. {video['title']}\n"
+            f"   {number(video['views'])} views"
+        )
+
+    lines += [
+        "",
+        "PERFORMANCE SUMMARY",
+        f"Videos analyzed: {len(videos)}",
+    ]
+
+    if videos:
+        average_views = sum(v["views"] for v in videos) / len(videos)
+        best_video = top_videos[0]
+
+        lines.append(
+            f"Average views across analyzed uploads: "
+            f"{number(average_views)}"
+        )
+        lines.append(
+            f"Top recent performer: {best_video['title']}"
+        )
+        lines.append(
+            f"Top recent video views: {number(best_video['views'])}"
+        )
+
+    lines += [
+        "",
+        "Report generated using public YouTube data.",
+        "Recent-video rankings cover the latest 10 uploads, "
+        "not the entire channel."
+    ]
+
+    return "\n".join(lines)
+
 
 def number(value, decimals=0):
     try:
