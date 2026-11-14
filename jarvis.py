@@ -13,6 +13,8 @@ from flask import Flask, request, jsonify, abort
 BOT_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
 CHAT_ID = os.environ["TELEGRAM_CHAT_ID"]
 GROQ_API_KEY = os.environ["GROQ_API_KEY"]
+YOUTUBE_API_KEY = os.environ["YOUTUBE_API_KEY"]
+YOUTUBE_CHANNEL_ID = "UCpbIOzEUNIbdbGOh8XHzsfw"
 
 WEBHOOK_SECRET = os.environ.get("WEBHOOK_SECRET", "")
 GROQ_MODEL = os.environ.get("GROQ_MODEL", "openai/gpt-oss-20b")
@@ -59,6 +61,40 @@ def send_message(message, chat_id=None):
 
         message = message[len(chunk):].lstrip()
 
+
+def get_youtube_stats():
+    params = urllib.parse.urlencode({
+        "part": "statistics,snippet",
+        "id": YOUTUBE_CHANNEL_ID,
+        "key": YOUTUBE_API_KEY
+    })
+
+    url = f"https://www.googleapis.com/youtube/v3/channels?{params}"
+    req = urllib.request.Request(
+        url,
+        headers={"User-Agent": "JARVIS/1.0"}
+    )
+
+    with urllib.request.urlopen(req, timeout=20) as response:
+        data = json.loads(response.read().decode())
+
+    items = data.get("items", [])
+
+    if not items:
+        return "I couldn't find the configured YouTube channel."
+
+    channel = items[0]
+    stats = channel.get("statistics", {})
+    snippet = channel.get("snippet", {})
+
+    return (
+        "JARVIS — YOUTUBE CHANNEL STATUS\n\n"
+        f"Channel: {snippet.get('title', 'Unavailable')}\n"
+        f"Subscribers: {number(stats.get('subscriberCount'))}\n"
+        f"Total views: {number(stats.get('viewCount'))}\n"
+        f"Total videos: {number(stats.get('videoCount'))}\n"
+        "\nSubscriber counts may be rounded by YouTube."
+    )
 
 def number(value, decimals=0):
     try:
@@ -300,6 +336,24 @@ def process_update(update):
             "AI engine: Groq connected.",
             chat_id
         )
+
+    elif (
+        user_text.lower() in ["/youtube", "/stats"]
+        or any(word in user_text.lower() for word in [
+            "subscribers", "subscriber count",
+            "channel views", "youtube stats",
+            "youtube statistics"
+        ])
+    ):
+        try:
+            report = get_youtube_stats()
+            send_message(report, chat_id)
+        except Exception as error:
+            print("YouTube API error:", str(error))
+            send_message(
+                "I couldn't retrieve your YouTube statistics. Please try again.",
+                chat_id
+            )
 
     elif user_text.lower() == "/help":
         send_message(
