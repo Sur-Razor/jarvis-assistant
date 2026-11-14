@@ -225,7 +225,9 @@ def ask_jarvis(question, chat_id):
         data=json.dumps(payload).encode(),
         headers={
             "Authorization": f"Bearer {GROQ_API_KEY}",
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "User-Agent": "JARVIS/1.0"
         },
         method="POST"
     )
