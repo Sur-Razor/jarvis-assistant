@@ -6,46 +6,54 @@ import io
 import zipfile
 import urllib.request
 import urllib.parse
-import subprocess
+import urllib.error
+
+from flask import Flask, request, jsonify, abort
 
 BOT_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
 CHAT_ID = os.environ["TELEGRAM_CHAT_ID"]
+GROQ_API_KEY = os.environ["GROQ_API_KEY"]
+
+WEBHOOK_SECRET = os.environ.get("WEBHOOK_SECRET", "")
+GROQ_MODEL = os.environ.get("GROQ_MODEL", "openai/gpt-oss-20b")
 
 API = f"https://api.telegram.org/bot{BOT_TOKEN}/"
 FILE_API = f"https://api.telegram.org/file/bot{BOT_TOKEN}/"
+GROQ_API = "https://api.groq.com/openai/v1/chat/completions"
 
-MODEL = "models/Qwen_Qwen3-0.6B-Q4_K_M.gguf"
-LLAMA = "llama.cpp/build/bin/llama-cli"
+app = Flask(__name__)
+
+# Temporary conversation and analytics memory.
+conversation_history = {}
+analytics_contexts = {}
+processed_updates = set()
 
 
 def telegram(method, data=None):
     payload = urllib.parse.urlencode(data or {}).encode()
-    request = urllib.request.Request(API + method, data=payload)
+    req = urllib.request.Request(API + method, data=payload)
 
-    with urllib.request.urlopen(request, timeout=30) as response:
+    with urllib.request.urlopen(req, timeout=30) as response:
         result = json.loads(response.read().decode())
 
     if not result.get("ok"):
-        raise RuntimeError(
-            result.get("description", f"Telegram {method} failed")
-        )
+        raise RuntimeError(result.get("description", "Telegram request failed"))
 
     return result
 
 
-def send_message(message):
-    # Split long messages to stay within Telegram's message limit.
+def send_message(message, chat_id=None):
+    chat_id = chat_id or CHAT_ID
     message = str(message)
 
     while message:
         chunk = message[:4000]
 
-        # Prefer splitting at a newline.
         if len(message) > 4000 and "\n" in chunk:
             chunk = chunk.rsplit("\n", 1)[0]
 
         telegram("sendMessage", {
-            "chat_id": CHAT_ID,
+            "chat_id": chat_id,
             "text": chunk
         })
 
@@ -73,9 +81,7 @@ def read_youtube_zip(file_bytes):
 
         with archive.open(table_name) as raw:
             text = io.TextIOWrapper(
-                raw,
-                encoding="utf-8-sig",
-                newline=""
+                raw, encoding="utf-8-sig", newline=""
             )
             rows = list(csv.DictReader(text))
 
@@ -96,12 +102,13 @@ def read_youtube_zip(file_bytes):
         if row is not total and (row.get("Video title") or "").strip()
     ]
 
-    videos.sort(
-        key=lambda row: float(
-            (row.get("Views") or "0").replace(",", "") or 0
-        ),
-        reverse=True
-    )
+    def get_views(row):
+        try:
+            return float((row.get("Views") or "0").replace(",", "") or 0)
+        except ValueError:
+            return 0
+
+    videos.sort(key=get_views, reverse=True)
 
     lines = [
         "JARVIS — YOUTUBE ANALYTICS",
@@ -165,9 +172,9 @@ def handle_document(message):
     if not file_path:
         raise ValueError("Telegram did not provide a downloadable file path.")
 
-    request = urllib.request.Request(FILE_API + file_path)
+    req = urllib.request.Request(FILE_API + file_path)
 
-    with urllib.request.urlopen(request, timeout=45) as response:
+    with urllib.request.urlopen(req, timeout=45) as response:
         file_bytes = response.read()
 
     report = read_youtube_zip(file_bytes)
@@ -176,14 +183,7 @@ def handle_document(message):
     return report
 
 
-
-def ask_jarvis(question, analytics_context=None):
-    if not os.path.isfile(MODEL):
-        return "My AI model is currently unavailable. Please try again later."
-
-    if not os.path.isfile(LLAMA):
-        return "My AI engine is currently unavailable. Please try again later."
-
+def ask_jarvis(question, chat_id):
     system_prompt = (
         "You are JARVIS, a personal AI assistant. "
         "Your personality is formal, composed, intelligent, and professional. "
@@ -196,140 +196,167 @@ def ask_jarvis(question, analytics_context=None):
         "Do not show your internal reasoning. Give only the final answer."
     )
 
-    prompt = f"{system_prompt}\n\n"
+    messages = [{"role": "system", "content": system_prompt}]
 
-    if analytics_context:
-        prompt += (
-            "The user has provided this YouTube analytics report. "
-            "Use it as factual context when answering. "
-            "Do not confuse reporting-period totals with current channel totals.\n\n"
-            f"{analytics_context}\n\n"
-        )
+    analytics = analytics_contexts.get(chat_id)
 
-    prompt += f"User: {question} /no_think\nJARVIS:"
+    if analytics:
+        messages.append({
+            "role": "system",
+            "content": (
+                "The user provided this YouTube analytics report. "
+                "Use it as factual context. Do not confuse reporting-period "
+                "totals with current public totals.\n\n" + analytics
+            )
+        })
 
-    command = [
-        LLAMA,
-        "-m", MODEL,
-        "-p", prompt,
-        "-n", "160",
-        "-c", "2048",
-        "--temp", "0.7",
-        "--no-display-prompt",
-        "--simple-io"
-    ]
+    history = conversation_history.get(chat_id, [])
+    messages.extend(history[-10:])
+    messages.append({"role": "user", "content": question})
+
+    payload = {
+        "model": GROQ_MODEL,
+        "messages": messages,
+        "max_completion_tokens": 500
+    }
+
+    req = urllib.request.Request(
+        GROQ_API,
+        data=json.dumps(payload).encode(),
+        headers={
+            "Authorization": f"Bearer {GROQ_API_KEY}",
+            "Content-Type": "application/json"
+        },
+        method="POST"
+    )
 
     try:
-        result = subprocess.run(
-            command,
-            capture_output=True,
-            text=True,
-            timeout=100
+        with urllib.request.urlopen(req, timeout=90) as response:
+            result = json.loads(response.read().decode())
+
+        answer = (
+            result.get("choices", [{}])[0]
+            .get("message", {})
+            .get("content", "")
+            .strip()
         )
-
-        if result.returncode != 0:
-            print("AI engine error:", result.stderr[-2000:])
-            return (
-                "I encountered a problem processing that request. "
-                "Please try again."
-            )
-
-        answer = result.stdout.strip()
-
-        if "JARVIS:" in answer:
-            answer = answer.rsplit("JARVIS:", 1)[-1].strip()
-
-        if "[ Prompt:" in answer:
-            answer = answer.split("[ Prompt:", 1)[0].strip()
-
-        if "\n>" in answer:
-            answer = answer.split("\n>", 1)[0].strip()
 
         if not answer:
             return "I wasn't able to generate a response. Please try again."
 
+        history.extend([
+            {"role": "user", "content": question},
+            {"role": "assistant", "content": answer}
+        ])
+
+        conversation_history[chat_id] = history[-12:]
+
         return answer[:3900]
 
-    except subprocess.TimeoutExpired:
-        return (
-            "That request took longer than expected. "
-            "Please try a shorter question."
+    except urllib.error.HTTPError as error:
+        details = error.read().decode(errors="replace")
+        print("Groq API error:", error.code, details[:1500])
+
+        if error.code == 429:
+            return "My AI service has reached its current usage limit. Please try again shortly."
+
+        return "I encountered a problem with my AI service. Please try again."
+
+    except Exception as error:
+        print("AI error:", str(error))
+        return "I couldn't process that request. Please try again."
+
+
+def process_update(update):
+    message = update.get("message", {})
+    chat = message.get("chat", {})
+    chat_id = str(chat.get("id", ""))
+
+    if chat_id != CHAT_ID:
+        return
+
+    user_text = (message.get("text") or "").strip()
+
+    if message.get("document"):
+        report = handle_document(message)
+
+        if report:
+            analytics_contexts[chat_id] = report
+
+        return
+
+    if user_text.lower() in ["/start", "hello", "hi"]:
+        send_message(
+            "Good evening, Sir. JARVIS systems are online. "
+            "How may I assist you?",
+            chat_id
         )
 
+    elif user_text.lower() == "/status":
+        send_message(
+            "JARVIS Telegram connection: ONLINE.\n"
+            "AI engine: Groq connected.",
+            chat_id
+        )
 
-def main():
-    print("JARVIS checking Telegram...")
+    elif user_text.lower() == "/help":
+        send_message(
+            "JARVIS COMMANDS\n\n"
+            "/start - Start JARVIS\n"
+            "/status - Check connection\n"
+            "/help - Show commands\n\n"
+            "You can also send me ordinary messages "
+            "to speak with my AI assistant.",
+            chat_id
+        )
 
-    updates = telegram("getUpdates", {
-        "timeout": 0
-    }).get("result", [])
+    elif user_text:
+        send_message("Certainly, Sir. One moment.", chat_id)
+        answer = ask_jarvis(user_text, chat_id)
+        send_message(answer, chat_id)
 
-    last_update_id = None
-    analytics_context = None
 
-    for item in updates:
-        last_update_id = item["update_id"]
+@app.route("/", methods=["GET"])
+def health():
+    return jsonify({
+        "status": "online",
+        "assistant": "JARVIS"
+    })
 
-        message = item.get("message", {})
-        chat = message.get("chat", {})
 
-        if str(chat.get("id")) != CHAT_ID:
-            continue
+@app.route("/telegram-webhook", methods=["POST"])
+def telegram_webhook():
+    if WEBHOOK_SECRET:
+        supplied_secret = request.headers.get(
+            "X-Telegram-Bot-Api-Secret-Token", ""
+        )
 
-        user_text = (message.get("text") or "").strip()
+        if supplied_secret != WEBHOOK_SECRET:
+            abort(403)
+
+    update = request.get_json(silent=True) or {}
+    update_id = update.get("update_id")
+
+    if update_id is not None:
+        if update_id in processed_updates:
+            return jsonify({"ok": True})
+
+        processed_updates.add(update_id)
+
+        if len(processed_updates) > 1000:
+            processed_updates.clear()
+            processed_updates.add(update_id)
+
+    try:
+        process_update(update)
+    except Exception as error:
+        print("Update processing error:", str(error))
 
         try:
-            if message.get("document"):
-                analytics_context = handle_document(message)
-
-            elif user_text.lower() in ["/start", "hello", "hi"]:
-                send_message(
-                    "Good evening, Sir. JARVIS systems are online. "
-                    "How may I assist you?"
-                )
-
-            elif user_text.lower() == "/status":
-                send_message(
-                    "JARVIS Telegram connection: ONLINE.\n"
-                    "AI engine: available."
-                )
-
-            elif user_text.lower() == "/help":
-                send_message(
-                    "JARVIS COMMANDS\n\n"
-                    "/start - Start JARVIS\n"
-                    "/status - Check connection\n"
-                    "/help - Show commands\n\n"
-                    "You can also send me ordinary messages "
-                    "to speak with my AI assistant."
-                )
-
-            elif user_text:
-                send_message("Certainly, Sir. One moment.")
-
-                answer = ask_jarvis(
-                    user_text,
-                    analytics_context
-                )
-
-                send_message(answer)
-
-        except Exception as error:
-            print(f"Update processing error: {error}")
-
             send_message(
-                "I encountered an error processing that request: "
-                f"{str(error)[:400]}"
+                "I encountered an error processing that request. Please try again."
             )
+        except Exception as send_error:
+            print("Telegram reply error:", str(send_error))
 
-    if last_update_id is not None:
-        telegram("getUpdates", {
-            "offset": last_update_id + 1,
-            "timeout": 0
-        })
-
-    print("JARVIS check complete.")
-
-
-if __name__ == "__main__":
-    main()
+    return jsonify({"ok": True})
