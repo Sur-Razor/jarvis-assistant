@@ -7,6 +7,7 @@ import zipfile
 import urllib.request
 import urllib.parse
 import urllib.error
+from datetime import datetime
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from youtube_monitor import monitor
@@ -39,6 +40,7 @@ scheduler.add_job(
     monitor,
     trigger="interval",
     minutes=15,
+    next_run_time=datetime.now(),
     id="youtube_monitor",
     replace_existing=True,
     max_instances=1
