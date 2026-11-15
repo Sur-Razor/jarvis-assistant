@@ -8,6 +8,9 @@ import urllib.request
 import urllib.parse
 import urllib.error
 
+from apscheduler.schedulers.background import BackgroundScheduler
+from youtube_monitor import monitor
+
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 
@@ -28,6 +31,22 @@ GROQ_API = "https://api.groq.com/openai/v1/chat/completions"
 
 app = Flask(__name__)
 
+scheduler = BackgroundScheduler(
+    timezone="America/Los_Angeles"
+)
+
+scheduler.add_job(
+    monitor,
+    trigger="interval",
+    minutes=15,
+    id="youtube_monitor",
+    replace_existing=True,
+    max_instances=1
+)
+
+if not scheduler.running:
+    scheduler.start()
+    
 # Temporary conversation and analytics memory.
 conversation_history = {}
 analytics_contexts = {}
