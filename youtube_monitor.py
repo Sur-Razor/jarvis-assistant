@@ -1,6 +1,7 @@
 
 import os
 import json
+import base64
 import urllib.request
 import urllib.parse
 import urllib.error
@@ -12,6 +13,9 @@ YOUTUBE_CHANNEL_ID = os.environ["YOUTUBE_CHANNEL_ID"]
 TELEGRAM_BOT_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
 TELEGRAM_CHAT_ID = os.environ["TELEGRAM_CHAT_ID"]
 
+GITHUB_TOKEN = os.environ["GITHUB_TOKEN"]
+GITHUB_REPOSITORY = os.environ["GITHUB_REPOSITORY"]
+
 STATE_FILE = "youtube_monitor_state.json"
 TIMEZONE = ZoneInfo("America/Los_Angeles")
 
@@ -22,18 +26,32 @@ MAJOR_MILESTONES = {
 }
 
 
-def youtube_request(endpoint, params):
-    params["key"] = YOUTUBE_API_KEY
-    query = urllib.parse.urlencode(params)
-    url = f"https://www.googleapis.com/youtube/v3/{endpoint}?{query}"
+def api_request(url, method="GET", data=None, headers=None):
+    request_headers = {
+        "User-Agent": "JARVIS/1.0"
+    }
+
+    if headers:
+        request_headers.update(headers)
 
     request = urllib.request.Request(
         url,
-        headers={"User-Agent": "JARVIS/1.0"}
+        data=data,
+        headers=request_headers,
+        method=method
     )
 
     with urllib.request.urlopen(request, timeout=25) as response:
         return json.loads(response.read().decode())
+
+
+def youtube_request(endpoint, params):
+    params["key"] = YOUTUBE_API_KEY
+    query = urllib.parse.urlencode(params)
+
+    url = f"https://www.googleapis.com/youtube/v3/{endpoint}?{query}"
+
+    return api_request(url)
 
 
 def send_telegram(message):
@@ -47,26 +65,79 @@ def send_telegram(message):
         "text": message
     }).encode()
 
-    request = urllib.request.Request(url, data=data)
-
-    with urllib.request.urlopen(request, timeout=25) as response:
-        result = json.loads(response.read().decode())
+    result = api_request(url, method="POST", data=data)
 
     if not result.get("ok"):
         raise RuntimeError("Telegram message could not be sent.")
 
 
-def load_state():
-    if not os.path.exists(STATE_FILE):
-        return None
+def github_state_url():
+    repo = urllib.parse.quote(GITHUB_REPOSITORY, safe="/")
+    path = urllib.parse.quote(STATE_FILE, safe="/")
 
-    with open(STATE_FILE, "r") as file:
-        return json.load(file)
+    return f"https://api.github.com/repos/{repo}/contents/{path}"
+
+
+def github_headers():
+    return {
+        "Authorization": f"Bearer {GITHUB_TOKEN}",
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28"
+    }
+
+
+def load_state():
+    try:
+        result = api_request(
+            github_state_url(),
+            headers=github_headers()
+        )
+
+        content = base64.b64decode(
+            result["content"]
+        ).decode()
+
+        state = json.loads(content)
+        state["_sha"] = result["sha"]
+
+        return state
+
+    except urllib.error.HTTPError as error:
+        if error.code == 404:
+            return None
+        raise
 
 
 def save_state(state):
-    with open(STATE_FILE, "w") as file:
-        json.dump(state, file, indent=4)
+    sha = state.pop("_sha", None)
+
+    content = json.dumps(
+        state,
+        indent=4
+    )
+
+    encoded_content = base64.b64encode(
+        content.encode()
+    ).decode()
+
+    payload = {
+        "message": "Update JARVIS YouTube monitoring history",
+        "content": encoded_content
+    }
+
+    if sha:
+        payload["sha"] = sha
+
+    data = json.dumps(payload).encode()
+
+    result = api_request(
+        github_state_url(),
+        method="PUT",
+        data=data,
+        headers=github_headers()
+    )
+
+    state["_sha"] = result["content"]["sha"]
 
 
 def get_channel_data():
@@ -105,15 +176,14 @@ def get_channel_data():
 
         if videos:
             video = videos[0]["snippet"]
-            resource = video.get("resourceId", {})
-
-            video_id = resource.get("videoId")
+            video_id = video.get(
+                "resourceId", {}
+            ).get("videoId")
 
             if video_id:
                 latest_video = {
                     "id": video_id,
-                    "title": video.get("title", "New upload"),
-                    "date": video.get("publishedAt", "")
+                    "title": video.get("title", "New upload")
                 }
 
     return {
@@ -135,7 +205,7 @@ def monitor():
 
     state = load_state()
 
-    # First run: establish a baseline without sending old alerts.
+    # First run establishes the starting baseline.
     if state is None:
         state = {
             "last_subscribers": subscribers,
@@ -162,28 +232,29 @@ def monitor():
         return
 
     previous_subscribers = state["last_subscribers"]
-    previous_views = state["last_views"]
 
     # Subscriber milestone alerts.
     if subscribers > previous_subscribers:
         first_goal = (previous_subscribers // 100 + 1) * 100
         last_goal = (subscribers // 100) * 100
 
+        reached_goals = []
+
         for goal in range(first_goal, last_goal + 1, 100):
             if goal in MAJOR_MILESTONES:
-                message = (
-                    "JARVIS — MAJOR SUBSCRIBER MILESTONE!\n\n"
-                    f"Congratulations! Sur-Razor has reached "
-                    f"{goal:,} subscribers!"
+                reached_goals.append(
+                    f"MAJOR MILESTONE: {goal:,} subscribers!"
                 )
             else:
-                message = (
-                    "JARVIS — SUBSCRIBER GOAL REACHED!\n\n"
-                    f"Sur-Razor has reached approximately "
-                    f"{goal:,} subscribers."
+                reached_goals.append(
+                    f"Subscriber goal reached: approximately {goal:,}"
                 )
 
-            send_telegram(message)
+        if reached_goals:
+            send_telegram(
+                "JARVIS — SUBSCRIBER MILESTONES\n\n"
+                + "\n".join(reached_goals)
+            )
 
     # New upload alert.
     if latest_video:
@@ -200,16 +271,16 @@ def monitor():
 
     # Daily summary at approximately 6 PM Pacific.
     if now.hour == 18 and state.get("last_daily_date") != today:
-        daily_start_subscribers = state.get(
+        starting_subscribers = state.get(
             "daily_start_subscribers", previous_subscribers
         )
 
-        daily_start_views = state.get(
-            "daily_start_views", previous_views
+        starting_views = state.get(
+            "daily_start_views", state["last_views"]
         )
 
-        subscriber_change = subscribers - daily_start_subscribers
-        view_change = views - daily_start_views
+        subscriber_change = subscribers - starting_subscribers
+        view_change = views - starting_views
 
         send_telegram(
             "JARVIS — DAILY YOUTUBE SUMMARY\n\n"
