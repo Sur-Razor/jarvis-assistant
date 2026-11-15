@@ -46,6 +46,7 @@ scheduler.add_job(
 
 if not scheduler.running:
     scheduler.start()
+    print("JARVIS YouTube monitor scheduler started.")
     
 # Temporary conversation and analytics memory.
 conversation_history = {}
