@@ -505,9 +505,8 @@ def process_update(update):
         )
 
     elif user_text:
-        send_message("Certainly, Sir. One moment.", chat_id)
-        answer = ask_jarvis(user_text, chat_id)
-        send_message(answer, chat_id)
+    answer = ask_jarvis(user_text, chat_id)
+    send_message(answer, chat_id)
 
 
 @app.route("/", methods=["GET"])
