@@ -464,6 +464,7 @@ def ask_jarvis(question, chat_id):
         return "I couldn't process that request. Please try again."
 
 
+
 def process_update(update):
     message = update.get("message", {})
     chat = message.get("chat", {})
@@ -484,8 +485,7 @@ def process_update(update):
 
     if user_text.lower() in ["/start", "hello", "hi"]:
         send_message(
-            "Good evening, Sir. JARVIS systems are online. "
-            "How may I assist you?",
+            "JARVIS systems are online. How may I assist you?",
             chat_id
         )
 
@@ -496,13 +496,12 @@ def process_update(update):
             chat_id
         )
 
-    elif (
-        user_text.lower() in ["/youtube", "/stats"]
-        or any(word in user_text.lower() for word in [
+    elif user_text.lower() in ["/youtube", "/stats"] or any(
+        word in user_text.lower() for word in [
             "subscribers", "subscriber count",
             "channel views", "youtube stats",
             "youtube statistics"
-        ])
+        ]
     ):
         try:
             report = get_youtube_stats()
@@ -523,26 +522,18 @@ def process_update(update):
             "JARVIS COMMANDS\n\n"
             "/start - Start JARVIS\n"
             "/status - Check connection\n"
+            "/youtube - Channel statistics\n"
             "/report - Detailed YouTube Analytics\n"
             "/help - Show commands\n\n"
             "You can also send me ordinary messages "
             "to speak with my AI assistant.",
             chat_id
         )
-    elif user_text.lower() == "/help":
-        send_message(
-            "JARVIS COMMANDS\n\n"
-            "/start - Start JARVIS\n"
-            "/status - Check connection\n"
-            "/help - Show commands\n\n"
-            "You can also send me ordinary messages "
-            "to speak with my AI assistant.",
-            chat_id
-        )
 
- elif user_text:
-    answer = ask_jarvis(user_text, chat_id)
-    send_message(answer, chat_id)
+    elif user_text:
+        answer = ask_jarvis(user_text, chat_id)
+        send_message(answer, chat_id)
+
 
 def get_youtube_analytics_report():
     from datetime import date, timedelta
