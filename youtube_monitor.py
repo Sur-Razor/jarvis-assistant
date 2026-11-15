@@ -8,13 +8,13 @@ import urllib.error
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-YOUTUBE_API_KEY = os.environ["YOUTUBE_API_KEY"]
-YOUTUBE_CHANNEL_ID = os.environ["YOUTUBE_CHANNEL_ID"]
-TELEGRAM_BOT_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
-TELEGRAM_CHAT_ID = os.environ["TELEGRAM_CHAT_ID"]
+YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY")
+YOUTUBE_CHANNEL_ID = os.getenv("YOUTUBE_CHANNEL_ID")
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
-GITHUB_TOKEN = os.environ["GITHUB_TOKEN"]
-GITHUB_REPOSITORY = os.environ["GITHUB_REPOSITORY"]
+GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
+GITHUB_REPOSITORY = os.getenv("GITHUB_REPOSITORY")
 
 STATE_FILE = "youtube_monitor_state.json"
 TIMEZONE = ZoneInfo("America/Los_Angeles")
