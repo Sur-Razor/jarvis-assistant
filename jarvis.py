@@ -8,6 +8,9 @@ import urllib.request
 import urllib.parse
 import urllib.error
 
+from google.oauth2.credentials import Credentials
+from googleapiclient.discovery import build
+
 from flask import Flask, request, jsonify, abort
 
 BOT_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
@@ -61,7 +64,25 @@ def send_message(message, chat_id=None):
 
         message = message[len(chunk):].lstrip()
 
+def get_youtube_analytics_service():
+    credentials = Credentials(
+        token=None,
+        refresh_token=os.environ["GOOGLE_REFRESH_TOKEN"],
+        token_uri="https://oauth2.googleapis.com/token",
+        client_id=os.environ["GOOGLE_CLIENT_ID"],
+        client_secret=os.environ["GOOGLE_CLIENT_SECRET"],
+        scopes=[
+            "https://www.googleapis.com/auth/yt-analytics.readonly",
+            "https://www.googleapis.com/auth/yt-analytics-monetary.readonly"
+        ]
+    )
 
+    return build(
+        "youtubeAnalytics",
+        "v2",
+        credentials=credentials,
+        cache_discovery=False
+    )
 
 def get_youtube_stats():
     def youtube_request(endpoint, params):
@@ -493,6 +514,21 @@ def process_update(update):
                 chat_id
             )
 
+    elif user_text.lower() == "/report":
+        report = get_youtube_analytics_report()
+        send_message(report, chat_id)
+
+    elif user_text.lower() == "/help":
+        send_message(
+            "JARVIS COMMANDS\n\n"
+            "/start - Start JARVIS\n"
+            "/status - Check connection\n"
+            "/report - Detailed YouTube Analytics\n"
+            "/help - Show commands\n\n"
+            "You can also send me ordinary messages "
+            "to speak with my AI assistant.",
+            chat_id
+        )
     elif user_text.lower() == "/help":
         send_message(
             "JARVIS COMMANDS\n\n"
@@ -504,10 +540,106 @@ def process_update(update):
             chat_id
         )
 
-    elif user_text:
+ elif user_text:
     answer = ask_jarvis(user_text, chat_id)
     send_message(answer, chat_id)
 
+def get_youtube_analytics_report():
+    from datetime import date, timedelta
+
+    try:
+        youtube = get_youtube_analytics_service()
+
+        today = date.today()
+        end_date = today - timedelta(days=1)
+        start_date = end_date - timedelta(days=6)
+
+        previous_end = start_date - timedelta(days=1)
+        previous_start = previous_end - timedelta(days=6)
+
+        metrics = (
+            "views,estimatedMinutesWatched,averageViewDuration,"
+            "subscribersGained,subscribersLost,estimatedRevenue,"
+            "likes,comments,shares"
+        )
+
+        def get_report(start, end):
+            return youtube.reports().query(
+                ids="channel==MINE",
+                startDate=start.isoformat(),
+                endDate=end.isoformat(),
+                metrics=metrics
+            ).execute()
+
+        current = get_report(start_date, end_date)
+        previous = get_report(previous_start, previous_end)
+
+        def values(report):
+            rows = report.get("rows", [])
+            if not rows:
+                return [0] * 9
+            return rows[0]
+
+        current_values = values(current)
+        previous_values = values(previous)
+
+        labels = [
+            "Views",
+            "Minutes watched",
+            "Average view duration (seconds)",
+            "Subscribers gained",
+            "Subscribers lost",
+            "Estimated revenue",
+            "Likes",
+            "Comments",
+            "Shares"
+        ]
+
+        lines = [
+            "JARVIS — YOUTUBE ANALYTICS",
+            "",
+            f"REPORTING PERIOD: {start_date} to {end_date}",
+            f"COMPARISON: {previous_start} to {previous_end}",
+            "",
+            "LAST 7 DAYS"
+        ]
+
+        for label, value in zip(labels, current_values):
+            if label == "Estimated revenue":
+                formatted = f"${float(value):,.2f}"
+            elif label == "Average view duration (seconds)":
+                formatted = f"{float(value):,.1f} seconds"
+            else:
+                formatted = number(value)
+
+            lines.append(f"{label}: {formatted}")
+
+        lines += ["", "PREVIOUS 7 DAYS", ""]
+
+        for label, current_value, previous_value in zip(
+            labels, current_values, previous_values
+        ):
+            difference = float(current_value) - float(previous_value)
+
+            if label == "Estimated revenue":
+                formatted = f"${difference:+,.2f}"
+            elif label == "Average view duration (seconds)":
+                formatted = f"{difference:+,.1f} seconds"
+            else:
+                formatted = f"{difference:+,.0f}"
+
+            lines.append(f"{label}: {formatted} change")
+
+        lines += [
+            "",
+            "Note: Analytics data can take 24–48 hours to update.",
+            "Revenue is estimated, not finalized."
+        ]
+
+        return "\n".join(lines)
+
+    except Exception as error:
+        return f"YouTube Analytics error: {str(error)}"
 
 @app.route("/", methods=["GET"])
 def health():
