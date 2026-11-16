@@ -17,6 +17,7 @@ GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 GITHUB_REPOSITORY = os.getenv("GITHUB_REPOSITORY")
 
 STATE_FILE = "youtube_monitor_state.json"
+STATE_BRANCH = "jarvis-state"
 TIMEZONE = ZoneInfo("America/Los_Angeles")
 
 MAJOR_MILESTONES = {
@@ -75,7 +76,10 @@ def github_state_url():
     repo = urllib.parse.quote(GITHUB_REPOSITORY, safe="/")
     path = urllib.parse.quote(STATE_FILE, safe="/")
 
-    return f"https://api.github.com/repos/{repo}/contents/{path}"
+    return (
+        f"https://api.github.com/repos/{repo}/contents/{path}"
+        f"?ref={STATE_BRANCH}"
+    )
 
 
 def github_headers():
@@ -121,9 +125,10 @@ def save_state(state):
     ).decode()
 
     payload = {
-        "message": "Update JARVIS YouTube monitoring history",
-        "content": encoded_content
-    }
+    "message": "Update JARVIS YouTube monitoring history",
+    "content": encoded_content,
+    "branch": STATE_BRANCH
+}
 
     if sha:
         payload["sha"] = sha
