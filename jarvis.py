@@ -40,7 +40,7 @@ scheduler.add_job(
     monitor,
     trigger="interval",
     minutes=15,
-    next_run_time=datetime.now(),
+    next_run_time=datetime.now(scheduler.timezone),
     id="youtube_monitor",
     replace_existing=True,
     max_instances=1
