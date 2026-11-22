@@ -1,0 +1,163 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JARVIS Voice Interface</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            background: #080d13;
+            color: #e8f7ff;
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .interface {
+            width: 90%;
+            max-width: 520px;
+            text-align: center;
+            padding: 35px;
+        }
+
+        h1 {
+            font-size: 38px;
+            letter-spacing: 8px;
+            color: #52d7ff;
+            margin-bottom: 5px;
+        }
+
+        .subtitle {
+            color: #7895a5;
+            letter-spacing: 4px;
+            font-size: 11px;
+        }
+
+        .orb {
+            width: 190px;
+            height: 190px;
+            margin: 45px auto 25px;
+            border: 2px solid #31b9e8;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 0 30px #087ba855,
+                        inset 0 0 30px #087ba833;
+            transition: 0.3s;
+        }
+
+        .orb.active {
+            box-shadow: 0 0 65px #12bfff,
+                        inset 0 0 45px #12bfff66;
+        }
+
+        .orb span {
+            font-size: 55px;
+            color: #52d7ff;
+        }
+
+        #status {
+            color: #8caab9;
+            margin: 20px 0 30px;
+        }
+
+        button {
+            background: #087da5;
+            color: white;
+            border: 1px solid #36c8f5;
+            padding: 15px 28px;
+            border-radius: 30px;
+            font-size: 15px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #109bc9;
+        }
+
+        #conversation {
+            margin-top: 30px;
+            text-align: left;
+            line-height: 1.6;
+            color: #b9d4df;
+            overflow-wrap: anywhere;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="interface">
+        <h1>J.A.R.V.I.S.</h1>
+        <div class="subtitle">PERSONAL AI ASSISTANT</div>
+
+        <div class="orb" id="orb">
+            <span>◉</span>
+        </div>
+
+        <div id="status">SYSTEM STANDBY</div>
+
+        <button id="startButton" onclick="startVoice()">
+            START CONVERSATION
+        </button>
+
+        <div id="conversation"></div>
+    </div>
+
+    <script>
+        function startVoice() {
+            const status = document.getElementById("status");
+
+            if (!("webkitSpeechRecognition" in window) &&
+                !("SpeechRecognition" in window)) {
+                status.textContent =
+                    "Speech recognition is not supported in this browser.";
+                return;
+            }
+
+            status.textContent = "VOICE SYSTEM READY";
+
+            const speech = window.SpeechRecognition ||
+                           window.webkitSpeechRecognition;
+
+            const recognition = new speech();
+            recognition.lang = "en-US";
+            recognition.continuous = false;
+            recognition.interimResults = false;
+
+            recognition.onstart = function () {
+                status.textContent = "LISTENING...";
+                document.getElementById("orb").classList.add("active");
+            };
+
+            recognition.onresult = function (event) {
+                const words = event.results[0][0].transcript;
+
+                document.getElementById("conversation").innerHTML =
+                    "<b>You:</b> " + words;
+
+                status.textContent = "VOICE CAPTURE SUCCESSFUL";
+            };
+
+            recognition.onerror = function () {
+                status.textContent = "VOICE ERROR - TRY AGAIN";
+            };
+
+            recognition.onend = function () {
+                document.getElementById("orb").classList.remove("active");
+            };
+
+            recognition.start();
+        }
+    </script>
+</body>
+</html>
