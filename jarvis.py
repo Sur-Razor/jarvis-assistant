@@ -15,7 +15,7 @@ from youtube_monitor import monitor
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 
-from flask import Flask, request, jsonify, abort
+from flask import Flask, request, jsonify, abort, render_template
 
 BOT_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
 CHAT_ID = os.environ["TELEGRAM_CHAT_ID"]
@@ -31,6 +31,10 @@ FILE_API = f"https://api.telegram.org/file/bot{BOT_TOKEN}/"
 GROQ_API = "https://api.groq.com/openai/v1/chat/completions"
 
 app = Flask(__name__)
+
+@app.route("/voice")
+def voice():
+    return render_template("voice.html")
 
 def run_youtube_monitor():
     print("JARVIS: YouTube monitor check starting.", flush=True)
