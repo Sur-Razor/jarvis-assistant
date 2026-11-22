@@ -724,3 +724,31 @@ def telegram_webhook():
             print("Telegram reply error:", repr(send_error), flush=True)
 
     return jsonify({"ok": True})
+
+@app.route("/voice-chat", methods=["POST"])
+def voice_chat():
+    data = request.get_json(silent=True) or {}
+
+    message = str(data.get("message", "")).strip()
+    session_id = str(data.get("session_id", "")).strip()
+
+    if not message:
+        return jsonify({"error": "No message provided."}), 400
+
+    if not session_id or len(session_id) > 80:
+        return jsonify({"error": "Invalid session."}), 400
+
+    if not all(c.isalnum() or c in "-_" for c in session_id):
+        return jsonify({"error": "Invalid session."}), 400
+
+    voice_chat_id = "voice_" + session_id
+
+    try:
+        answer = ask_jarvis(message, voice_chat_id)
+        return jsonify({"reply": answer})
+
+    except Exception as error:
+        print("Voice chat error:", repr(error), flush=True)
+        return jsonify({
+            "error": "JARVIS encountered a problem. Please try again."
+        }), 500
