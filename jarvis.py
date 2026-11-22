@@ -677,21 +677,28 @@ def health():
     })
 
 
+
 @app.route("/telegram-webhook", methods=["POST"])
 def telegram_webhook():
+    print("JARVIS DEBUG: Webhook request received.", flush=True)
+
     if WEBHOOK_SECRET:
         supplied_secret = request.headers.get(
             "X-Telegram-Bot-Api-Secret-Token", ""
         )
 
         if supplied_secret != WEBHOOK_SECRET:
+            print("JARVIS DEBUG: Webhook secret rejected.", flush=True)
             abort(403)
+
+    print("JARVIS DEBUG: Webhook secret accepted.", flush=True)
 
     update = request.get_json(silent=True) or {}
     update_id = update.get("update_id")
 
     if update_id is not None:
         if update_id in processed_updates:
+            print("JARVIS DEBUG: Duplicate update ignored.", flush=True)
             return jsonify({"ok": True})
 
         processed_updates.add(update_id)
@@ -700,16 +707,20 @@ def telegram_webhook():
             processed_updates.clear()
             processed_updates.add(update_id)
 
+    print("JARVIS DEBUG: Starting process_update.", flush=True)
+
     try:
         process_update(update)
+        print("JARVIS DEBUG: process_update completed.", flush=True)
+
     except Exception as error:
-        print("Update processing error:", str(error))
+        print("Update processing error:", repr(error), flush=True)
 
         try:
             send_message(
                 "I encountered an error processing that request. Please try again."
             )
         except Exception as send_error:
-            print("Telegram reply error:", str(send_error))
+            print("Telegram reply error:", repr(send_error), flush=True)
 
     return jsonify({"ok": True})
