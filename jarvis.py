@@ -72,14 +72,17 @@ def telegram(method, data=None):
     payload = urllib.parse.urlencode(data or {}).encode()
     req = urllib.request.Request(API + method, data=payload)
 
+    print("JARVIS: Sending Telegram API request:", method, flush=True)
+
     with urllib.request.urlopen(req, timeout=30) as response:
         result = json.loads(response.read().decode())
+
+    print("JARVIS: Telegram API response received:", result.get("ok"), flush=True)
 
     if not result.get("ok"):
         raise RuntimeError(result.get("description", "Telegram request failed"))
 
     return result
-
 
 def send_message(message, chat_id=None):
     chat_id = chat_id or CHAT_ID
