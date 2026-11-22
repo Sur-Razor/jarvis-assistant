@@ -32,12 +32,20 @@ GROQ_API = "https://api.groq.com/openai/v1/chat/completions"
 
 app = Flask(__name__)
 
+def run_youtube_monitor():
+    print("JARVIS: YouTube monitor check starting.", flush=True)
+
+    try:
+        monitor()
+    except Exception as error:
+        print("JARVIS: YouTube monitor failed:", repr(error), flush=True)
+
 scheduler = BackgroundScheduler(
     timezone="America/Los_Angeles"
 )
 
 scheduler.add_job(
-    monitor,
+    run_youtube_monitor,
     trigger="interval",
     minutes=15,
     next_run_time=datetime.now(scheduler.timezone),
