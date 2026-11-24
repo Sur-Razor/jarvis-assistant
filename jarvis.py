@@ -725,6 +725,7 @@ def telegram_webhook():
 
     return jsonify({"ok": True})
 
+
 @app.route("/voice-chat", methods=["POST"])
 def voice_chat():
     data = request.get_json(silent=True) or {}
@@ -742,13 +743,6 @@ def voice_chat():
         return jsonify({"error": "Invalid session."}), 400
 
     voice_chat_id = "voice_" + session_id
-
-    try:
-        print("VOICE DEBUG: Received message. Calling JARVIS AI.", flush=True)
-        answer = ask_jarvis(message, voice_chat_id)
-        print("VOICE DEBUG: JARVIS AI returned a response.", flush=True)
-        
-            voice_chat_id = "voice_" + session_id
 
     try:
         print("VOICE DEBUG: Received message. Calling JARVIS AI.", flush=True)
