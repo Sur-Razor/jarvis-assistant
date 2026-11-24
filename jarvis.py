@@ -744,7 +744,17 @@ def voice_chat():
     voice_chat_id = "voice_" + session_id
 
     try:
+        print("VOICE DEBUG: Received message. Calling JARVIS AI.", flush=True)
         answer = ask_jarvis(message, voice_chat_id)
+        print("VOICE DEBUG: JARVIS AI returned a response.", flush=True)
+        
+            voice_chat_id = "voice_" + session_id
+
+    try:
+        print("VOICE DEBUG: Received message. Calling JARVIS AI.", flush=True)
+        answer = ask_jarvis(message, voice_chat_id)
+        print("VOICE DEBUG: JARVIS AI returned a response.", flush=True)
+
         return jsonify({"reply": answer})
 
     except Exception as error:
