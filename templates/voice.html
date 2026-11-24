@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JARVIS Voice Interface</title>
+    <title>JARVIS Call</title>
 
     <style>
         * {
@@ -14,150 +14,589 @@
         body {
             margin: 0;
             min-height: 100vh;
-            background: #080d13;
-            color: #e8f7ff;
-            font-family: Arial, sans-serif;
+            background: #111216;
+            color: white;
+            font-family: -apple-system, BlinkMacSystemFont,
+                         "Segoe UI", sans-serif;
             display: flex;
             justify-content: center;
             align-items: center;
         }
 
-        .interface {
-            width: 90%;
-            max-width: 520px;
+        .call-screen {
+            width: 100%;
+            max-width: 430px;
+            min-height: 100vh;
+            padding: 35px 25px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
             text-align: center;
-            padding: 35px;
+        }
+
+        .top-bar {
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            color: #aaa;
+            font-size: 13px;
+        }
+
+        .contact {
+            margin-top: 75px;
+        }
+
+        .avatar {
+            width: 112px;
+            height: 112px;
+            margin: auto;
+            border-radius: 50%;
+            background: linear-gradient(145deg, #414650, #22252c);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 43px;
+            font-weight: 300;
+            color: #e5e7eb;
+            box-shadow: 0 8px 35px #0008;
         }
 
         h1 {
-            font-size: 38px;
-            letter-spacing: 8px;
-            color: #52d7ff;
-            margin-bottom: 5px;
+            font-size: 32px;
+            font-weight: 500;
+            letter-spacing: 2px;
+            margin: 22px 0 5px;
         }
 
         .subtitle {
-            color: #7895a5;
-            letter-spacing: 4px;
-            font-size: 11px;
+            color: #92949d;
+            font-size: 14px;
         }
 
-        .orb {
-            width: 190px;
-            height: 190px;
-            margin: 45px auto 25px;
-            border: 2px solid #31b9e8;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 0 0 30px #087ba855,
-                        inset 0 0 30px #087ba833;
-            transition: 0.3s;
-        }
-
-        .orb.active {
-            box-shadow: 0 0 65px #12bfff,
-                        inset 0 0 45px #12bfff66;
-        }
-
-        .orb span {
-            font-size: 55px;
-            color: #52d7ff;
+        #timer {
+            font-size: 17px;
+            color: #d5d5d9;
+            margin-top: 28px;
+            font-variant-numeric: tabular-nums;
         }
 
         #status {
-            color: #8caab9;
-            margin: 20px 0 30px;
+            color: #a0a1a8;
+            font-size: 14px;
+            margin-top: 8px;
         }
 
-        button {
-            background: #087da5;
+        .visualizer {
+            height: 65px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+            margin: 28px 0;
+        }
+
+        .bar {
+            width: 4px;
+            height: 10px;
+            border-radius: 5px;
+            background: #a6a8b0;
+            transition: height 0.2s;
+        }
+
+        .visualizer.active .bar {
+            animation: wave 0.8s ease-in-out infinite alternate;
+            background: #70a9ff;
+        }
+
+        .bar:nth-child(2n) {
+            animation-delay: 0.2s;
+        }
+
+        .bar:nth-child(3n) {
+            animation-delay: 0.4s;
+        }
+
+        @keyframes wave {
+            from { height: 9px; }
+            to { height: 42px; }
+        }
+
+        .controls {
+            width: 100%;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 30px 15px;
+            margin-top: 20px;
+        }
+
+        .control {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 9px;
+        }
+
+        .control button {
+            width: 66px;
+            height: 66px;
+            border: none;
+            border-radius: 50%;
+            background: #373941;
             color: white;
-            border: 1px solid #36c8f5;
-            padding: 15px 28px;
-            border-radius: 30px;
-            font-size: 15px;
+            font-size: 23px;
             cursor: pointer;
         }
 
-        button:hover {
-            background: #109bc9;
+        .control button.selected {
+            background: white;
+            color: #222;
+        }
+
+        .control span {
+            color: #c3c3ca;
+            font-size: 12px;
+        }
+
+        .end-call {
+            margin-top: 45px;
+            width: 75px;
+            height: 75px;
+            border: none;
+            border-radius: 50%;
+            background: #ff453a;
+            color: white;
+            font-size: 29px;
+            cursor: pointer;
+        }
+
+        .start-call {
+            margin-top: 45px;
+            padding: 17px 35px;
+            border: none;
+            border-radius: 35px;
+            background: #30d158;
+            color: white;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
         }
 
         #conversation {
-            margin-top: 30px;
+            width: 100%;
+            margin-top: 35px;
             text-align: left;
-            line-height: 1.6;
-            color: #b9d4df;
+            max-height: 190px;
+            overflow-y: auto;
+            color: #d0d0d5;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        .message {
+            margin: 12px 0;
             overflow-wrap: anywhere;
+        }
+
+        .message strong {
+            color: white;
+        }
+
+        @media (max-height: 750px) {
+            .contact {
+                margin-top: 35px;
+            }
+
+            .visualizer {
+                margin: 15px 0;
+            }
+
+            .controls {
+                gap: 20px 15px;
+            }
         }
     </style>
 </head>
 
 <body>
-    <div class="interface">
-        <h1>J.A.R.V.I.S.</h1>
-        <div class="subtitle">PERSONAL AI ASSISTANT</div>
+    <main class="call-screen">
 
-        <div class="orb" id="orb">
-            <span>◉</span>
+        <div class="top-bar">
+            <span>JARVIS</span>
+            <span>VOICE CONNECTION</span>
         </div>
 
-        <div id="status">SYSTEM STANDBY</div>
+        <section class="contact">
+            <div class="avatar">J</div>
+            <h1>J.A.R.V.I.S.</h1>
+            <div class="subtitle">Personal AI Assistant</div>
 
-        <button id="startButton" onclick="startVoice()">
-            START CONVERSATION
+            <div id="timer">00:00</div>
+            <div id="status">Ready to connect</div>
+        </section>
+
+        <div class="visualizer" id="visualizer">
+            <div class="bar"></div>
+            <div class="bar"></div>
+            <div class="bar"></div>
+            <div class="bar"></div>
+            <div class="bar"></div>
+            <div class="bar"></div>
+            <div class="bar"></div>
+            <div class="bar"></div>
+            <div class="bar"></div>
+            <div class="bar"></div>
+            <div class="bar"></div>
+        </div>
+
+        <div class="controls">
+
+            <div class="control">
+                <button id="muteButton">🎙</button>
+                <span>Mute</span>
+            </div>
+
+            <div class="control">
+                <button id="speakerButton" class="selected">🔊</button>
+                <span>Speaker</span>
+            </div>
+
+            <div class="control">
+                <button id="transcriptButton">☰</button>
+                <span>Transcript</span>
+            </div>
+
+        </div>
+
+        <button id="startButton" class="start-call">
+            Connect to JARVIS
+        </button>
+
+        <button id="endButton" class="end-call" hidden>
+            ☎
         </button>
 
         <div id="conversation"></div>
-    </div>
+
+    </main>
 
     <script>
-        function startVoice() {
-            const status = document.getElementById("status");
+        const status = document.getElementById("status");
+        const timer = document.getElementById("timer");
+        const startButton = document.getElementById("startButton");
+        const endButton = document.getElementById("endButton");
+        const muteButton = document.getElementById("muteButton");
+        const speakerButton = document.getElementById("speakerButton");
+        const transcriptButton = document.getElementById("transcriptButton");
+        const conversation = document.getElementById("conversation");
+        const visualizer = document.getElementById("visualizer");
 
-            if (!("webkitSpeechRecognition" in window) &&
-                !("SpeechRecognition" in window)) {
-                status.textContent =
-                    "Speech recognition is not supported in this browser.";
+        const SpeechRecognition =
+            window.SpeechRecognition ||
+            window.webkitSpeechRecognition;
+
+        let recognition;
+        let callActive = false;
+        let muted = false;
+        let speakerEnabled = true;
+        let busy = false;
+        let listening = false;
+        let seconds = 0;
+        let timerInterval = null;
+
+        const sessionId = window.crypto?.randomUUID
+            ? window.crypto.randomUUID()
+            : "voice-" + Date.now() + "-" +
+              Math.random().toString(36).slice(2);
+
+        function updateStatus(message) {
+            status.textContent = message;
+        }
+
+        function addMessage(sender, message) {
+            const entry = document.createElement("div");
+            entry.className = "message";
+
+            const label = document.createElement("strong");
+            label.textContent = sender + ": ";
+
+            const content = document.createElement("span");
+            content.textContent = message;
+
+            entry.appendChild(label);
+            entry.appendChild(content);
+            conversation.appendChild(entry);
+
+            conversation.scrollTop = conversation.scrollHeight;
+        }
+
+        function updateTimer() {
+            seconds++;
+
+            const minutes = Math.floor(seconds / 60);
+            const remaining = seconds % 60;
+
+            timer.textContent =
+                String(minutes).padStart(2, "0") + ":" +
+                String(remaining).padStart(2, "0");
+        }
+
+        function startListening() {
+            if (!callActive || muted || busy || !recognition) {
                 return;
             }
 
-            status.textContent = "VOICE SYSTEM READY";
+            try {
+                recognition.start();
+            } catch (error) {
+                console.log("Recognition start:", error);
+            }
+        }
 
-            const speech = window.SpeechRecognition ||
-                           window.webkitSpeechRecognition;
+        function speakReply(message) {
+            if (!speakerEnabled || !("speechSynthesis" in window)) {
+                busy = false;
+                updateStatus("Connected - listening");
+                startListening();
+                return;
+            }
 
-            const recognition = new speech();
+            window.speechSynthesis.cancel();
+
+            const utterance = new SpeechSynthesisUtterance(message);
+            utterance.lang = "en-US";
+            utterance.rate = 1;
+            utterance.pitch = 1;
+
+            utterance.onstart = function () {
+                updateStatus("JARVIS is speaking...");
+                visualizer.classList.add("active");
+            };
+
+            utterance.onend = function () {
+                visualizer.classList.remove("active");
+                busy = false;
+
+                if (callActive) {
+                    updateStatus("Listening...");
+                    startListening();
+                }
+            };
+
+            utterance.onerror = function () {
+                visualizer.classList.remove("active");
+                busy = false;
+
+                if (callActive) {
+                    updateStatus("Connected - listening");
+                    startListening();
+                }
+            };
+
+            window.speechSynthesis.speak(utterance);
+        }
+
+        async function sendToJarvis(message) {
+            busy = true;
+            updateStatus("JARVIS is thinking...");
+            visualizer.classList.add("active");
+
+            try {
+                const response = await fetch("/voice-chat", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        message: message,
+                        session_id: sessionId
+                    })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok || !data.reply) {
+                    throw new Error(data.error || "No response received.");
+                }
+
+                addMessage("JARVIS", data.reply);
+                visualizer.classList.remove("active");
+                speakReply(data.reply);
+
+            } catch (error) {
+                console.error("JARVIS voice error:", error);
+
+                addMessage(
+                    "SYSTEM",
+                    "I couldn't reach JARVIS. Please try again."
+                );
+
+                visualizer.classList.remove("active");
+                busy = false;
+                updateStatus("Connection error");
+
+                if (callActive) {
+                    setTimeout(startListening, 1500);
+                }
+            }
+        }
+
+        function startCall() {
+            if (!SpeechRecognition) {
+                updateStatus(
+                    "Speech recognition is not supported. Please use Chrome."
+                );
+                return;
+            }
+
+            if (!("speechSynthesis" in window)) {
+                updateStatus(
+                    "Speech output is not supported in this browser."
+                );
+                return;
+            }
+
+            recognition = new SpeechRecognition();
             recognition.lang = "en-US";
             recognition.continuous = false;
             recognition.interimResults = false;
 
             recognition.onstart = function () {
-                status.textContent = "LISTENING...";
-                document.getElementById("orb").classList.add("active");
+                listening = true;
+                updateStatus("Listening...");
+                visualizer.classList.add("active");
             };
 
             recognition.onresult = function (event) {
-                const words = event.results[0][0].transcript;
+                const message = event.results[0][0].transcript.trim();
 
-                document.getElementById("conversation").innerHTML =
-                    "<b>You:</b> " + words;
+                if (!message) return;
 
-                status.textContent = "VOICE CAPTURE SUCCESSFUL";
+                addMessage("You", message);
+                visualizer.classList.remove("active");
+
+                sendToJarvis(message);
             };
 
-            recognition.onerror = function () {
-                status.textContent = "VOICE ERROR - TRY AGAIN";
+            recognition.onerror = function (event) {
+                console.log("Speech recognition error:", event.error);
+
+                if (event.error === "not-allowed") {
+                    updateStatus("Microphone permission denied");
+                    endCall();
+                } else if (event.error !== "no-speech" &&
+                           event.error !== "aborted") {
+                    updateStatus("Microphone error");
+                }
             };
 
             recognition.onend = function () {
-                document.getElementById("orb").classList.remove("active");
+                listening = false;
+                visualizer.classList.remove("active");
+
+                if (callActive && !busy && !muted) {
+                    setTimeout(startListening, 500);
+                }
             };
 
-            recognition.start();
+            callActive = true;
+            muted = false;
+            busy = false;
+            seconds = 0;
+
+            startButton.hidden = true;
+            endButton.hidden = false;
+
+            timer.textContent = "00:00";
+            conversation.innerHTML = "";
+
+            updateStatus("Connecting...");
+            timerInterval = setInterval(updateTimer, 1000);
+
+            startListening();
         }
+
+        function endCall() {
+            callActive = false;
+            busy = false;
+            listening = false;
+
+            if (recognition) {
+                recognition.onend = null;
+                recognition.stop();
+                recognition = null;
+            }
+
+            if ("speechSynthesis" in window) {
+                window.speechSynthesis.cancel();
+            }
+
+            clearInterval(timerInterval);
+
+            visualizer.classList.remove("active");
+
+            updateStatus("Call ended");
+            startButton.hidden = false;
+            endButton.hidden = true;
+
+            muteButton.classList.remove("selected");
+            speakerButton.classList.add("selected");
+
+            muteButton.textContent = "🎙";
+            speakerButton.textContent = "🔊";
+
+            muted = false;
+            speakerEnabled = true;
+        }
+
+        startButton.addEventListener("click", startCall);
+        endButton.addEventListener("click", endCall);
+
+        muteButton.addEventListener("click", function () {
+            muted = !muted;
+
+            muteButton.classList.toggle("selected", muted);
+            muteButton.textContent = muted ? "🔇" : "🎙";
+
+            if (muted) {
+                if (recognition && listening) {
+                    recognition.stop();
+                }
+                updateStatus("Microphone muted");
+            } else {
+                updateStatus("Listening...");
+                startListening();
+            }
+        });
+
+        speakerButton.addEventListener("click", function () {
+            speakerEnabled = !speakerEnabled;
+
+            speakerButton.classList.toggle(
+                "selected",
+                speakerEnabled
+            );
+
+            speakerButton.textContent =
+                speakerEnabled ? "🔊" : "🔈";
+
+            if (!speakerEnabled) {
+                window.speechSynthesis.cancel();
+                busy = false;
+
+                if (callActive) {
+                    updateStatus("Listening...");
+                    startListening();
+                }
+            }
+        });
+
+        transcriptButton.addEventListener("click", function () {
+            conversation.hidden = !conversation.hidden;
+            transcriptButton.classList.toggle(
+                "selected",
+                !conversation.hidden
+            );
+        });
     </script>
 </body>
 </html>
